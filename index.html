@@ -30,7 +30,6 @@
             border: 1px solid #1e293b;
         }
         .privacy-blur { filter: blur(20px); }
-        /* Hidden Shadow Processor */
         #matrixCanvas { display: none; }
     </style>
 </head>
@@ -79,7 +78,7 @@
             <div class="bg-cyan-500/5 border border-cyan-500/10 rounded-[2rem] p-6">
                 <div class="flex justify-between items-center mb-4">
                     <span id="resLabel" class="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Output</span>
-                    <button id="actionBtn" onclick="copyIt()" class="text-[10px] bg-white text-black px-4 py-1.5 rounded-full font-black">COPY</button>
+                    <button id="actionBtn" class="text-[10px] bg-white text-black px-4 py-1.5 rounded-full font-black">COPY</button>
                 </div>
                 <p id="resText" class="text-xl font-medium text-white break-words mb-4"></p>
                 <div id="imgBox" class="hidden rounded-xl overflow-hidden border border-cyan-500/30">
@@ -98,6 +97,7 @@
     <script>
         let settings = { ghost: false, stealth: false };
         let shadowFile = null;
+        let currentBlobUrl = null;
 
         function toggleSet(type) {
             settings[type] = !settings[type];
@@ -107,13 +107,9 @@
 
         function handleShadow(input) {
             if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    shadowFile = e.target.result;
-                    document.getElementById('shadowStat').innerText = "READY";
-                    document.getElementById('shadowStat').className = "text-[10px] font-black text-white";
-                };
-                reader.readAsDataURL(input.files[0]);
+                shadowFile = input.files[0];
+                document.getElementById('shadowStat').innerText = "READY";
+                document.getElementById('shadowStat').style.color = "#ffffff";
             }
         }
 
@@ -124,18 +120,22 @@
             const resImg = document.getElementById('resImg');
             const imgBox = document.getElementById('imgBox');
             const actionBtn = document.getElementById('actionBtn');
-            
             let shift = parseInt(document.getElementById('shift').value) || 0;
 
-            // SHADOW IMAGE LOGIC
             if (shadowFile) {
+                // Use ObjectURL instead of Base64 to save memory
                 const img = new Image();
-                img.src = shadowFile;
-                await img.decode();
+                const tempUrl = URL.createObjectURL(shadowFile);
+                img.src = tempUrl;
+                
+                await new Promise(resolve => img.onload = resolve);
+                
                 const cvs = document.getElementById('matrixCanvas');
                 const ctx = cvs.getContext('2d');
                 cvs.width = img.width; cvs.height = img.height;
                 ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(tempUrl); // Clean up original
+
                 const data = ctx.getImageData(0, 0, cvs.width, cvs.height);
                 const px = data.data;
 
@@ -147,38 +147,42 @@
                     seed = (seed * 16807) % 2147483647;
                 }
                 ctx.putImageData(data, 0, 0);
-                const shadowUrl = cvs.toDataURL("image/png");
 
-                resText.innerText = "Shadow Matrix Processed";
-                resImg.src = shadowUrl;
-                imgBox.classList.remove('hidden');
-                actionBtn.innerText = "DOWNLOAD";
-                actionBtn.onclick = () => {
-                    const dl = document.createElement('a');
-                    dl.download = mode === 'enc' ? 'shadow.png' : 'restored.png';
-                    dl.href = shadowUrl; dl.click();
-                };
+                // Export as Blob (much smaller and faster than toDataURL)
+                cvs.toBlob((blob) => {
+                    if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+                    currentBlobUrl = URL.createObjectURL(blob);
+                    
+                    resText.innerText = "Shadow Matrix Processed";
+                    resImg.src = currentBlobUrl;
+                    imgBox.classList.remove('hidden');
+                    resArea.classList.remove('hidden');
+                    
+                    actionBtn.innerText = "DOWNLOAD";
+                    actionBtn.onclick = () => {
+                        const dl = document.createElement('a');
+                        dl.download = mode === 'enc' ? 'shadow.png' : 'restored.png';
+                        dl.href = currentBlobUrl; dl.click();
+                    };
+                }, 'image/png');
             } 
-            // TEXT LOGIC (v5.0 Standard)
             else if (input.value) {
                 if(mode === 'dec') shift = -shift;
                 const result = input.value.split('').map(c => String.fromCharCode(c.charCodeAt(0) + (c === ' ' ? 0 : shift))).join('');
                 resText.innerText = result;
                 imgBox.classList.add('hidden');
+                resArea.classList.remove('hidden');
                 actionBtn.innerText = "COPY";
-                actionBtn.onclick = copyIt;
+                actionBtn.onclick = () => {
+                    navigator.clipboard.writeText(result);
+                    alert("Copied!");
+                };
             }
 
-            resArea.classList.remove('hidden');
             if(settings.ghost) {
                 input.value = ''; shadowFile = null;
                 document.getElementById('shadowStat').innerText = "LOAD";
             }
-        }
-
-        function copyIt() {
-            navigator.clipboard.writeText(document.getElementById('resText').innerText);
-            alert("Copied!");
         }
     </script>
 </body>
