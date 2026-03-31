@@ -1,0 +1,8 @@
+{
+  "appId": "com.vault.shadow.v12",
+  "appName": "Vault v12",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
