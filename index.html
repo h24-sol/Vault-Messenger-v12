@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Vault v12 | Shadow Protocol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;600;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --neon: #00fff2; --bg: #000000; }
+        body {
+            background: var(--bg);
+            font-family: 'Outfit', sans-serif;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .v12-glass {
+            background: rgba(10, 10, 10, 0.9);
+            border: 1px solid rgba(0, 255, 242, 0.2);
+            box-shadow: 0 0 50px rgba(0, 255, 242, 0.1);
+            backdrop-filter: blur(20px);
+        }
+        .neon-border { border: 1px solid var(--neon); }
+        .neon-text { text-shadow: 0 0 10px rgba(0, 255, 242, 0.5); }
+        .btn-prime {
+            background: var(--neon);
+            color: #000;
+            font-weight: 900;
+            transition: 0.3s;
+            text-transform: uppercase;
+        }
+        .btn-prime:active { transform: scale(0.95); box-shadow: 0 0 20px var(--neon); }
+        .privacy-blur { filter: blur(50px); opacity: 0; transition: 0.5s; }
+        #burnBar { transition: width 30s linear; width: 0%; height: 2px; background: var(--neon); }
+        canvas { display: none; }
+    </style>
+</head>
+<body class="p-4">
+
+    <div id="appContainer" class="w-full max-w-lg v12-glass rounded-[3rem] p-8 md:p-10 relative overflow-hidden">
+        
+        <header class="text-center mb-8">
+            <div class="inline-block px-3 py-1 border border-cyan-500/30 rounded-full mb-4">
+                <span class="text-[8px] font-bold tracking-[0.6em] text-cyan-400 uppercase">Sovereign Encryption</span>
+            </div>
+            <h1 class="text-5xl font-black italic neon-text tracking-tighter uppercase">Vault v12</h1>
+            <p class="text-[10px] text-slate-500 font-bold mt-2 tracking-widest">SHADOW PROTOCOL • BANGLADESH 2026</p>
+        </header>
+
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
+                <label class="text-[9px] text-cyan-400 font-bold uppercase block mb-1">Matrix Key</label>
+                <input type="password" id="shift" value="1600" class="bg-transparent w-full font-black text-white outline-none text-xl">
+            </div>
+            <label class="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10">
+                <span class="text-[9px] text-slate-500 font-bold uppercase">Media Port</span>
+                <span id="fileStat" class="text-xs font-black text-cyan-400">UPLOAD</span>
+                <input type="file" id="imgInput" accept="image/*" class="hidden" onchange="handleFile(this)">
+            </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-6">
+            <button onclick="toggleSet('ghost')" id="ghostBtn" class="bg-white/5 py-3 rounded-xl border border-white/5 text-[10px] font-bold uppercase transition">
+                Ghost Mode: <span id="ghostStat" class="text-slate-500">OFF</span>
+            </button>
+            <button onclick="toggleSet('stealth')" id="stealthBtn" class="bg-white/5 py-3 rounded-xl border border-white/5 text-[10px] font-bold uppercase transition">
+                Stealth: <span id="stealthStat" class="text-slate-500">OFF</span>
+            </button>
+        </div>
+
+        <div id="previewBox" class="hidden mb-6 rounded-2xl overflow-hidden border border-cyan-500/20 shadow-2xl">
+            <img id="preview" src="" class="w-full h-auto opacity-70">
+        </div>
+
+        <textarea id="msgInput" placeholder="Enter message or load shadow..." class="w-full bg-black border border-white/10 rounded-[2rem] p-6 h-32 text-white outline-none text-lg resize-none mb-6 focus:border-cyan-400/50 transition-all"></textarea>
+
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button onclick="run('enc')" class="btn-prime py-5 rounded-2xl">SHRED</button>
+            <button onclick="run('dec')" class="bg-white/10 text-white font-black py-5 rounded-2xl border border-white/10">RESTORE</button>
+        </div>
+
+        <div id="resArea" class="hidden space-y-4">
+            <div class="p-6 rounded-[2rem] bg-cyan-400/5 border border-cyan-400/20 relative">
+                <div class="flex justify-between items-center mb-4">
+                    <span id="resTitle" class="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Decrypted Shadow</span>
+                    <button id="actionBtn" class="text-[9px] bg-white text-black px-4 py-1.5 rounded-full font-black uppercase">Copy</button>
+                </div>
+                <p id="resText" class="text-lg text-white break-words mb-4 font-medium"></p>
+                <div id="resImgBox" class="hidden rounded-xl overflow-hidden border border-cyan-500/40">
+                    <img id="resImg" src="" class="w-full">
+                </div>
+                <div class="mt-4 overflow-hidden rounded-full bg-white/5">
+                    <div id="burnBar"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-10 pt-6 border-t border-white/5 text-center">
+            <p class="text-[9px] text-slate-700 font-bold tracking-[0.4em] uppercase">Architecture by Manis</p>
+        </footer>
+    </div>
+
+    <canvas id="mc"></canvas>
+
+    <script>
+        let settings = { ghost: false, stealth: false };
+        let imgData = null;
+        let burn;
+
+        function toggleSet(t) {
+            settings[t] = !settings[t];
+            document.getElementById(t + 'Stat').innerText = settings[t] ? "ACTIVE" : "OFF";
+            document.getElementById(t + 'Stat').style.color = settings[t] ? "#00fff2" : "#64748b";
+            if(t === 'stealth') document.getElementById('msgInput').style.webkitTextSecurity = settings[t] ? "disc" : "none";
+        }
+
+        function handleFile(i) {
+            if (i.files && i.files[0]) {
+                const r = new FileReader();
+                r.onload = (e) => {
+                    imgData = e.target.result;
+                    document.getElementById('preview').src = imgData;
+                    document.getElementById('previewBox').classList.remove('hidden');
+                    document.getElementById('fileStat').innerText = "LOADED";
+                };
+                r.readAsDataURL(i.files[0]);
+            }
+        }
+
+        async function run(m) {
+            const input = document.getElementById('msgInput');
+            const shift = parseInt(document.getElementById('shift').value) || 0;
+            const resArea = document.getElementById('resArea');
+            const resImgBox = document.getElementById('resImgBox');
+            const resText = document.getElementById('resText');
+            const actionBtn = document.getElementById('actionBtn');
+
+            // IMAGE LOGIC
+            if (imgData) {
+                const img = new Image();
+                img.src = imgData;
+                await img.decode();
+                const cvs = document.getElementById('mc');
+                const ctx = cvs.getContext('2d');
+                cvs.width = img.width; cvs.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                const data = ctx.getImageData(0, 0, cvs.width, cvs.height);
+                const px = data.data;
+
+                let seed = shift;
+                for (let i = 0; i < px.length; i += 4) {
+                    px[i] = px[i] ^ (seed % 255);
+                    px[i+1] = px[i+1] ^ ((seed * 2) % 255);
+                    px[i+2] = px[i+2] ^ ((seed * 3) % 255);
+                    seed = (seed * 16807) % 2147483647;
+                }
+                ctx.putImageData(data, 0, 0);
+                const finalUrl = cvs.toDataURL("image/png");
+
+                resText.innerText = "Matrix Shredding Successful";
+                document.getElementById('resImg').src = finalUrl;
+                resImgBox.classList.remove('hidden');
+                actionBtn.innerText = "DOWNLOAD";
+                actionBtn.onclick = () => {
+                    const l = document.createElement('a');
+                    l.download = m === 'enc' ? 'shadow.png' : 'vault_restored.png';
+                    l.href = finalUrl; l.click();
+                };
+            } 
+            // TEXT LOGIC
+            else if (input.value) {
+                let s = shift; if(m === 'dec') s = -s;
+                const out = input.value.split('').map(c => String.fromCharCode(c.charCodeAt(0) + (c === ' ' ? 0 : s))).join('');
+                resText.innerText = out;
+                resImgBox.classList.add('hidden');
+                actionBtn.innerText = "COPY";
+                actionBtn.onclick = () => {
+                    navigator.clipboard.writeText(out); alert("Copied!");
+                };
+            }
+
+            resArea.classList.remove('hidden');
+            startBurn();
+
+            if(settings.ghost) {
+                input.value = ''; imgData = null;
+                document.getElementById('previewBox').classList.add('hidden');
+                document.getElementById('fileStat').innerText = "UPLOAD";
+            }
+        }
+
+        function startBurn() {
+            const bar = document.getElementById('burnBar');
+            clearTimeout(burn);
+            bar.style.transition = 'none'; bar.style.width = '0%';
+            setTimeout(() => { bar.style.transition = 'width 30s linear'; bar.style.width = '100%'; }, 100);
+            burn = setTimeout(() => { document.getElementById('resArea').classList.add('hidden'); }, 30000);
+        }
+
+        window.onblur = () => document.getElementById('appContainer').classList.add('privacy-blur');
+        window.onfocus = () => document.getElementById('appContainer').classList.remove('privacy-blur');
+    </script>
+</body>
+</html>
